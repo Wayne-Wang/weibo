@@ -1,3 +1,4 @@
+import TwitterLDA.tweet;
 import com.alibaba.fastjson.JSON;
 import com.huaban.analysis.jieba.JiebaSegmenter;
 import edu.berkeley.nlp.util.Lists;
@@ -27,8 +28,11 @@ public class FenCiService {
 
     public static void main(String[] args) throws Exception {
         FenCiService fenCiService = new FenCiService();
-        // 微博拉取的文件路径
-        String fileName = "G:/小论文2/情感分析/weibos/data/huawei7.xlsx";
+        // 微博拉取的文件路径，将需要计算情感值的内容放到博文一列中
+        String fileName = "/Users/wangyang/Downloads//分词/fedex-xiugai.xlsx";
+        /**
+         * 读取excel中的内容
+         */
         List<Map> list = fenCiService.readExcel(fileName);
         fenCiService.splitText(list);
         JiebaSegmenter jiebaSegmenter = new JiebaSegmenter();
@@ -46,21 +50,47 @@ public class FenCiService {
             map.put("splitContent", splitContent);
             System.out.println("分词后的数据为：" + JSON.toJSONString(map));
         }
-        List<String> stopWordList = fenCiService.readStopWord();
-//        // 第一个参数是文件所在位置，第二个参数是第几个sheet页，从0开始代表第一个sheet页
-        Map<String, String> emotionWordList = fenCiService.readWExcelWord("G:/小论文2/情感分析/weibos/情感词典/本文情感词典汇总/情感词典.xlsx", 0);
-        Map<String, String> negativeWordList = fenCiService.readWExcelWord("G:/小论文2/情感分析/weibos/情感词典/本文情感词典汇总/否定词典.xlsx", 0);
-        Map<String, String> degreeWordList = fenCiService.readWExcelWord("G:/小论文2/情感分析/weibos/情感词典/本文情感词典汇总/程度副词词典.xlsx", 0);
-        Map<String, String> conjunctionWordList = fenCiService.readWExcelWord("G:/小论文2/情感分析/weibos/情感词典/本文情感词典汇总/连词词典.xlsx", 0);
+        String stopFilePath = "/Users/wangyang/Downloads//微博数据/停用词.txt";
+        List<String> stopWordList = fenCiService.readStopWord(stopFilePath);
+        // 第一个参数是文件所在位置，第二个参数是第几个sheet页，从0开始代表第一个sheet页
+        /**
+         * 获取情感值字段信息，情感词和情感值，分别是第2个sheet页和第3个sheet页
+         */
+        Map<String, String> emotionWordList = fenCiService.readWExcelWord("/Users/wangyang/Downloads//微博数据/情感词典.xlsx", 0);
+        Map<String, String> negativeWordList = fenCiService.readWExcelWord("/Users/wangyang/Downloads//微博数据/否定词典.xlsx", 0);
+        /**
+         * 获取程度副词字段信息，情感词和情感值，分别是第6个sheet页和第7个sheet页
+         */
+        Map<String, String> degreeWordList = fenCiService.readWExcelWord("/Users/wangyang/Downloads//微博数据/程度副词词典.xlsx", 0);
+        Map<String, String> conjunctionWordList = fenCiService.readWExcelWord("/Users/wangyang/Downloads//微博数据/连词词典.xlsx", 0);
         System.out.println("情感词：" + emotionWordList.size() + ", 否定词：" + negativeWordList.size() + ", 程度副词；" + degreeWordList.size() + ", 连词： " + conjunctionWordList.size());
+		/**
+         * 去掉停用词
+         */
         fenCiService.dealStopWord(list, stopWordList);
+        /**
+         * 处理情感词
+         */
         fenCiService.dealEmotionWord(list, emotionWordList);
         fenCiService.dealPrefixWordList(list, negativeWordList, "negativeValue", "negativePrefix");
+        /**
+         * 处理程度副词
+         */
         fenCiService.dealPrefixWordList(list, degreeWordList, "degreeValue", "degreePrefix");
         fenCiService.dealOtherWordList(list, conjunctionWordList, "conjunctionValue", "conjunctionPrefix");
+        /**
+         * 计算情感值
+         * 每一句的情感值：同类型情感词相加，异类型情感词相乘
+         * （1+1）--情感词库的值；2+1.5----副词的值 （-1）是否定词，因此（1+1）*（2+1.5）*（-1）=-7；实际上：1*2+（-1）+1.5*1=2.5。
+         */
         fenCiService.dealFinalAnalysis(list);
-//        // 最后文件解析存储的文件地址
-        fenCiService.writeExcel("G:/小论文2/情感分析/weibos/huawei7.xls", list);
+        // 最后文件解析存储的文件地址
+        /**
+         * 生成最后的结果
+         * 输入结果路径为：/Users/wangyang/Downloads/情感值分析结果.xls 此为mac盘符，windows盘符如：D:/Research/Projects/NTUproject/TLDA/data/
+         */
+        fenCiService.writeExcel("/Users/wangyang/Downloads//微博数据/情感分析结果-fedex.xls", list);
+        System.out.println("任务执行结束");
     }
 
     private void splitText(List<Map> list) {
@@ -69,11 +99,30 @@ public class FenCiService {
             if (StringUtils.isBlank(text)) {
                 continue;
             }
+			String subText = dealStr(text, 0);
             // 将博文分为子句的分隔符：中英文下的四种符号
-            String[] splitStr = text.split("[，。！？,.!?]");
-            System.out.println("数据[" + text + "]分割后数据为：" + JSON.toJSONString(splitStr));
-            map.put("splitText", Lists.newList(splitStr));
+            String[] splitStrArr = subText.split("[，。！？,.!?：: ]");
+            System.out.println("数据[" + text + "]分割后数据为：" + JSON.toJSONString(splitStrArr));
+            List<String> splitStrList = Lists.newList(splitStrArr);
+            List<String> otherList = new ArrayList<>();
+            for (String splitStr : splitStrList) {
+                if (tweet.isNoisy(splitStr)) {
+                    System.out.println(splitStr + "含有特殊字符去除");
+                } else {
+                    otherList.add(splitStr);
+                }
+            }
+            map.put("splitText", otherList);
         }
+    }
+	private static String dealStr(String str, int beginIndex) {
+        if (str.indexOf("@", beginIndex) > 0) {
+            int index = str.indexOf("@", beginIndex);
+            String subStr = str.substring(0, index) + " " + str.substring(index);
+            beginIndex = index + 2;
+            return dealStr(subStr, beginIndex);
+        }
+        return str;
     }
 
     private void writeExcel(String filePath, List<Map> list) throws Exception {
@@ -81,7 +130,7 @@ public class FenCiService {
         HSSFSheet sheet = wb.createSheet("Sheet1");//创建一个sheet页
         HSSFRow row = sheet.createRow(0);//创建第一行
         row.createCell(0).setCellValue("微博博文");
-        row.createCell(1).setCellValue("分词结果");
+//        row.createCell(1).setCellValue("分词结果");
         row.createCell(2).setCellValue("最终情感值");
         int count = 1;
         HSSFCellStyle cellStyle = wb.createCellStyle();
@@ -91,7 +140,11 @@ public class FenCiService {
             HSSFRow row1 = sheet.createRow(count);
             row1.setRowStyle(cellStyle);
             row1.createCell(0).setCellValue(MapUtils.getString(result, "text"));
-            row1.createCell(1).setCellValue(JSON.toJSONString(result));
+            String text = JSON.toJSONString(result);
+            if (text.length() > 32700) {
+                text = text.substring(0, 32700);
+            }
+//            row1.createCell(1).setCellValue(text);
             row1.createCell(2).setCellValue(MapUtils.getDoubleValue(result, "emotion_result", 0.00d));
             count++;
         }
@@ -255,9 +308,8 @@ public class FenCiService {
     }
 
 
-    public List<String> readStopWord() throws Exception {
-        String file = "G:/小论文2/情感分析/weibos/情感词典/分词和停用词/中文/停用词.txt";
-        BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(file), "GBK"));
+    public List<String> readStopWord(String stopFilePath) throws Exception {
+        BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(stopFilePath), "GBK"));
         String line = null;
         int count = 1;
         List<String> stopWordList = new ArrayList<>();

@@ -10,6 +10,7 @@ import java.util.regex.Pattern;
 //import Common.Stopwords;
 
 import Common.ComUtil;
+import Common.FenciUtil;
 import Common.Stopwords;
 
 //import edu.mit.jwi.item.Word;
@@ -31,7 +32,7 @@ public class tweet {
 		ArrayList<Integer> words = new ArrayList<Integer>();
 		ArrayList<String> tokens = new ArrayList<String>();
 
-		ComUtil.tokenize(inline, tokens);
+		FenciUtil.tokenize(inline, tokens);
 
 		for (int i = 0; i < tokens.size(); i++) {
 			String tmpToken = tokens.get(i).toLowerCase();
@@ -59,7 +60,7 @@ public class tweet {
 
 	}
 
-	private boolean isNoisy(String token) {
+	public static boolean isNoisy(String token) {
 		if (token.toLowerCase().contains("#pb#")
 				|| token.toLowerCase().contains("http:"))
 			return true;
