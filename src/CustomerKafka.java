@@ -76,7 +76,7 @@ public class CustomerKafka {
         map.put("testName", "wayne");
         kafkaMessage.put("message", kafkaMessage);
         Properties props = new Properties();
-        props.put("bootstrap.servers", "172.30.225.131:9092");
+        props.put("bootstrap.servers", "192.168.11.90:9092");
         props.put("acks", "all");
         props.put("retries", 0);
         props.put("batch.size", 16384);
